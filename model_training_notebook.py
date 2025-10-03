@@ -231,6 +231,7 @@ with open(readme_path, 'w') as f:
 
 # Find and display best model
 best_model = df_results.iloc[0]
+best_model_name = best_model['Model']
 print(f"\n{'='*80}")
 print(f"BEST MODEL: {best_model['Model']}")
 print(f"ROC-AUC: {best_model['ROC-AUC']:.4f}")
