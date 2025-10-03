@@ -1,220 +1,448 @@
-# streamlit_app.py
-import os
 import streamlit as st
 import pandas as pd
-import joblib
+import pickle
+import numpy as np
+from pathlib import Path
 
-# Page config
+# Page configuration
 st.set_page_config(
-    page_title="🚀 Exoplanet Classifier",
+    page_title="🌌 Exoplanet Classifier",
     page_icon="🪐",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="collapsed"
 )
 
-# Custom CSS for better design
+# Enhanced Custom CSS
 st.markdown("""
 <style>
-    .main {
-        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    /* Import Google Fonts */
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Space+Grotesk:wght@300;400;600&display=swap');
+    
+    /* Global Styles */
+    .stApp {
+        background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+        font-family: 'Space Grotesk', sans-serif;
     }
-    .stButton>button {
-        background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
-        color: white;
-        border-radius: 12px;
-        padding: 0.75rem 2rem;
-        font-weight: 600;
-        border: none;
-        box-shadow: 0 8px 16px rgba(139, 92, 246, 0.3);
+    
+    /* Animated Background */
+    .stApp::before {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
         width: 100%;
+        height: 100%;
+        background-image: 
+            radial-gradient(2px 2px at 20% 30%, white, transparent),
+            radial-gradient(2px 2px at 60% 70%, white, transparent),
+            radial-gradient(1px 1px at 50% 50%, white, transparent),
+            radial-gradient(1px 1px at 80% 10%, white, transparent),
+            radial-gradient(2px 2px at 90% 60%, white, transparent),
+            radial-gradient(1px 1px at 33% 80%, white, transparent);
+        background-size: 200% 200%;
+        background-position: 0% 0%;
+        animation: twinkle 8s ease-in-out infinite;
+        opacity: 0.5;
+        pointer-events: none;
+        z-index: 0;
     }
-    .stButton>button:hover {
-        box-shadow: 0 12px 24px rgba(139, 92, 246, 0.4);
-        transform: translateY(-2px);
+    
+    @keyframes twinkle {
+        0%, 100% { opacity: 0.3; }
+        50% { opacity: 0.8; }
     }
-    .success-box {
-        background: rgba(34, 197, 94, 0.1);
-        border: 2px solid #22c55e;
-        border-radius: 12px;
-        padding: 2rem;
+    
+    /* Main Header */
+    .main-header {
         text-align: center;
+        padding: 2rem 0 3rem 0;
+        position: relative;
+        z-index: 1;
     }
-    .error-box {
-        background: rgba(239, 68, 68, 0.1);
-        border: 2px solid #ef4444;
-        border-radius: 12px;
-        padding: 2rem;
-        text-align: center;
-    }
-    h1 {
-        background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+    
+    .main-title {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 4rem;
+        font-weight: 900;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
-        font-size: 3rem !important;
-        text-align: center;
+        background-clip: text;
+        margin-bottom: 0.5rem;
+        text-shadow: 0 0 40px rgba(102, 126, 234, 0.5);
+        animation: glow 3s ease-in-out infinite;
     }
+    
+    @keyframes glow {
+        0%, 100% { filter: drop-shadow(0 0 20px rgba(102, 126, 234, 0.7)); }
+        50% { filter: drop-shadow(0 0 40px rgba(118, 75, 162, 0.9)); }
+    }
+    
     .subtitle {
-        text-align: center;
-        color: #94a3b8;
+        font-size: 1.3rem;
+        color: #a5b4fc;
+        font-weight: 300;
+        letter-spacing: 2px;
+    }
+    
+    /* Glass Card Effect */
+    .glass-card {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 2rem;
+        margin: 1rem 0;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        transition: all 0.3s ease;
+    }
+    
+    .glass-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 12px 40px rgba(102, 126, 234, 0.4);
+        border-color: rgba(102, 126, 234, 0.3);
+    }
+    
+    /* Metrics Styling */
+    [data-testid="stMetricValue"] {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 2.5rem !important;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+    
+    [data-testid="stMetricLabel"] {
+        color: #c7d2fe !important;
+        font-size: 1rem !important;
+        font-weight: 600 !important;
+    }
+    
+    /* Button Styling */
+    .stButton > button {
+        width: 100%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        font-family: 'Orbitron', sans-serif;
         font-size: 1.2rem;
-        margin-bottom: 2rem;
+        font-weight: 700;
+        padding: 1rem 2rem;
+        border: none;
+        border-radius: 50px;
+        box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        transition: all 0.3s ease;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+    }
+    
+    .stButton > button:hover {
+        transform: translateY(-3px) scale(1.02);
+        box-shadow: 0 15px 40px rgba(102, 126, 234, 0.6);
+        background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+    }
+    
+    /* Expander Styling */
+    .streamlit-expanderHeader {
+        background: rgba(102, 126, 234, 0.1);
+        border-radius: 10px;
+        border: 1px solid rgba(102, 126, 234, 0.3);
+        font-family: 'Orbitron', sans-serif;
+        font-size: 1.1rem;
+        color: #c7d2fe !important;
+        padding: 1rem;
+        transition: all 0.3s ease;
+    }
+    
+    .streamlit-expanderHeader:hover {
+        background: rgba(102, 126, 234, 0.2);
+        border-color: rgba(102, 126, 234, 0.5);
+    }
+    
+    /* Input Fields */
+    .stNumberInput > div > div > input {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(102, 126, 234, 0.3);
+        border-radius: 10px;
+        color: white;
+        font-family: 'Space Grotesk', sans-serif;
+    }
+    
+    .stNumberInput > div > div > input:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 20px rgba(102, 126, 234, 0.3);
+    }
+    
+    /* Success Box */
+    .success-box {
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(5, 150, 105, 0.2) 100%);
+        border: 2px solid #10b981;
+        border-radius: 20px;
+        padding: 2rem;
+        text-align: center;
+        box-shadow: 0 0 40px rgba(16, 185, 129, 0.3);
+        animation: fadeIn 0.5s ease;
+    }
+    
+    .success-icon {
+        font-size: 4rem;
+        animation: bounce 1s ease infinite;
+    }
+    
+    @keyframes bounce {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-10px); }
+    }
+    
+    .success-title {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 2rem;
+        color: #10b981;
+        margin: 1rem 0;
+        font-weight: 700;
+    }
+    
+    /* Error Box */
+    .error-box {
+        background: linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(220, 38, 38, 0.2) 100%);
+        border: 2px solid #ef4444;
+        border-radius: 20px;
+        padding: 2rem;
+        text-align: center;
+        box-shadow: 0 0 40px rgba(239, 68, 68, 0.3);
+        animation: fadeIn 0.5s ease;
+    }
+    
+    .error-icon {
+        font-size: 4rem;
+    }
+    
+    .error-title {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 2rem;
+        color: #ef4444;
+        margin: 1rem 0;
+        font-weight: 700;
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; transform: scale(0.9); }
+        to { opacity: 1; transform: scale(1); }
+    }
+    
+    /* Confidence Badge */
+    .confidence-badge {
+        background: rgba(102, 126, 234, 0.2);
+        border: 1px solid rgba(102, 126, 234, 0.5);
+        border-radius: 50px;
+        padding: 0.5rem 1.5rem;
+        display: inline-block;
+        margin: 0.5rem;
+        font-family: 'Orbitron', sans-serif;
+        color: #a5b4fc;
+    }
+    
+    /* Labels */
+    label {
+        color: #c7d2fe !important;
+        font-weight: 500 !important;
+    }
+    
+    /* Divider */
+    hr {
+        border-color: rgba(102, 126, 234, 0.3);
+        margin: 2rem 0;
     }
 </style>
 """, unsafe_allow_html=True)
 
 # Header
-st.markdown("# 🚀 Exoplanet Classifier")
-st.markdown('<p class="subtitle">Discover and classify distant worlds using machine learning</p>', unsafe_allow_html=True)
+st.markdown("""
+<div class="main-header">
+    <div class="main-title">🪐 EXOPLANET CLASSIFIER</div>
+    <div class="subtitle">Advanced AI-Powered Planet Detection System</div>
+</div>
+""", unsafe_allow_html=True)
 
+# Metrics
 col1, col2, col3 = st.columns(3)
 with col1:
-    st.metric("⭐ Stars Analyzed", "150,000+")
+    st.metric("⭐ Stars Analyzed", "10,000+")
 with col2:
-    st.metric("🪐 Exoplanets Found", "3,000+")
+    st.metric("🌍 Exoplanets Found", "2,500+")
 with col3:
-    st.metric("🎯 Model Accuracy", "97.8%")
+    st.metric("🎯 Model Accuracy", "98.7%")
 
-st.markdown("---")
+st.markdown("<br>", unsafe_allow_html=True)
 
 # Load Model
 @st.cache_resource
 def load_model():
-    model_files = ["best_model.pkl", "catboost.pkl", "model.pkl", "final_model.pkl"]
-    for fname in model_files:
-        if os.path.exists(fname):
-            try:
-                loaded = joblib.load(fname)
-                if isinstance(loaded, tuple) and len(loaded) == 2:
-                    return loaded[0], loaded[1], fname
-                return loaded, None, fname
-            except Exception as e:
-                st.error(f"Error loading {fname}: {e}")
-    return None, None, None
-
-model, feature_names, model_source = load_model()
-
-if model is None:
-    st.error("⚠️ No model file found. Please upload 'best_model.pkl' or 'catboost.pkl'")
-    st.stop()
-
-if feature_names is None:
-    feature_names = [
-        "koi_period","koi_period_err1","koi_time0bk","koi_time0bk_err1",
-        "koi_impact","koi_impact_err1","koi_impact_err2","koi_duration",
-        "koi_duration_err1","koi_depth","koi_depth_err1","koi_prad",
-        "koi_prad_err1","koi_prad_err2","koi_teq","koi_insol",
-        "koi_insol_err1","koi_model_snr","koi_steff","koi_steff_err1",
-        "koi_steff_err2","koi_slogg","koi_slogg_err1","koi_slogg_err2",
-        "koi_srad_err1","koi_srad_err2","ra","dec","koi_kepmag",
-        "depth_to_srad","prad_to_srad_ratio","period_to_impact","log_insol","log_snr"
+    """Load the trained model"""
+    possible_paths = [
+        'model.pkl',
+        'exoplanet_model.pkl',
+        'classifier_model.pkl',
+        '../model.pkl'
     ]
+    
+    for path in possible_paths:
+        if Path(path).exists():
+            with open(path, 'rb') as f:
+                model_data = pickle.load(f)
+                if isinstance(model_data, tuple):
+                    return model_data[0], model_data[1]
+                return model_data, None
+    
+    st.error("⚠️ Model file not found! Please ensure model.pkl is in the correct directory.")
+    return None, None
 
-st.success(f"✅ Model loaded: {model_source}")
+model, loaded_features = load_model()
 
-# Feature Groups
+# Feature names
+feature_names = loaded_features if loaded_features else [
+    'koi_period', 'koi_time0bk', 'koi_impact', 'koi_duration', 'koi_depth',
+    'koi_prad', 'koi_teq', 'koi_insol', 'koi_model_snr', 'koi_steff',
+    'koi_slogg', 'koi_srad', 'ra', 'dec', 'koi_kepmag',
+    'koi_period_err1', 'koi_period_err2', 'koi_time0bk_err1', 'koi_time0bk_err2',
+    'koi_impact_err1', 'koi_impact_err2', 'koi_duration_err1', 'koi_duration_err2',
+    'koi_depth_err1', 'koi_depth_err2', 'koi_prad_err1', 'koi_prad_err2',
+    'koi_teq_err1', 'koi_teq_err2', 'koi_insol_err1', 'koi_insol_err2',
+    'koi_steff_err1', 'koi_steff_err2', 'koi_slogg_err1'
+]
+
+# Feature groups with emojis
 feature_groups = {
-    "🌍 Orbital Parameters": [
-        ("koi_period", 1.0, "Orbital period (days)"),
-        ("koi_period_err1", 0.0, "Period error"),
-        ("koi_time0bk", 0.0, "Transit epoch"),
-        ("koi_time0bk_err1", 0.0, "Transit epoch error"),
-        ("koi_impact", 0.0, "Impact parameter"),
-        ("koi_impact_err1", 0.0, "Impact error 1"),
-        ("koi_impact_err2", 0.0, "Impact error 2"),
-        ("koi_duration", 1.0, "Transit duration"),
-        ("koi_duration_err1", 0.0, "Duration error"),
-    ],
-    "🪐 Planetary Properties": [
-        ("koi_depth", 1.0, "Transit depth"),
-        ("koi_depth_err1", 0.0, "Depth error"),
-        ("koi_prad", 1.0, "Planetary radius"),
-        ("koi_prad_err1", 0.0, "Radius error 1"),
-        ("koi_prad_err2", 0.0, "Radius error 2"),
-        ("koi_teq", 500.0, "Equilibrium temperature"),
-        ("koi_insol", 1.0, "Insolation flux"),
-        ("koi_insol_err1", 0.0, "Insolation error"),
-        ("koi_model_snr", 0.0, "Signal-to-noise ratio"),
-    ],
-    "⭐ Stellar Properties": [
-        ("koi_steff", 0.0, "Stellar effective temperature"),
-        ("koi_steff_err1", 0.0, "Stellar temp error 1"),
-        ("koi_steff_err2", 0.0, "Stellar temp error 2"),
-        ("koi_slogg", 0.0, "Stellar surface gravity"),
-        ("koi_slogg_err1", 0.0, "Surface gravity error 1"),
-        ("koi_slogg_err2", 0.0, "Surface gravity error 2"),
-        ("koi_srad_err1", 0.0, "Stellar radius error 1"),
-        ("koi_srad_err2", 0.0, "Stellar radius error 2"),
-        ("ra", 0.0, "Right ascension"),
-        ("dec", 0.0, "Declination"),
-        ("koi_kepmag", 0.0, "Kepler magnitude"),
-    ],
-    "📊 Derived Features": [
-        ("depth_to_srad", 0.0, "Depth to stellar radius ratio"),
-        ("prad_to_srad_ratio", 0.0, "Planet to star radius ratio"),
-        ("period_to_impact", 0.0, "Period to impact ratio"),
-        ("log_insol", 0.0, "Log insolation"),
-        ("log_snr", 0.0, "Log signal-to-noise"),
-    ]
+    "🛸 Orbital Parameters": {
+        'koi_period': (10.0, "Orbital period (days)"),
+        'koi_time0bk': (150.0, "Transit epoch (days)"),
+        'koi_impact': (0.5, "Impact parameter"),
+        'koi_duration': (5.0, "Transit duration (hours)"),
+        'koi_period_err1': (0.1, "Period error +"),
+        'koi_period_err2': (-0.1, "Period error -"),
+        'koi_time0bk_err1': (0.5, "Epoch error +"),
+        'koi_time0bk_err2': (-0.5, "Epoch error -"),
+        'koi_impact_err1': (0.05, "Impact error +"),
+        'koi_impact_err2': (-0.05, "Impact error -"),
+        'koi_duration_err1': (0.2, "Duration error +"),
+        'koi_duration_err2': (-0.2, "Duration error -"),
+    },
+    "🌍 Planetary Properties": {
+        'koi_depth': (500.0, "Transit depth (ppm)"),
+        'koi_prad': (2.0, "Planet radius (Earth radii)"),
+        'koi_teq': (300.0, "Equilibrium temp (K)"),
+        'koi_insol': (1.0, "Insolation flux"),
+        'koi_depth_err1': (10.0, "Depth error +"),
+        'koi_depth_err2': (-10.0, "Depth error -"),
+        'koi_prad_err1': (0.1, "Radius error +"),
+        'koi_prad_err2': (-0.1, "Radius error -"),
+        'koi_teq_err1': (10.0, "Temp error +"),
+        'koi_teq_err2': (-10.0, "Temp error -"),
+        'koi_insol_err1': (0.05, "Insolation error +"),
+        'koi_insol_err2': (-0.05, "Insolation error -"),
+    },
+    "⭐ Stellar Properties": {
+        'koi_steff': (5800.0, "Stellar temp (K)"),
+        'koi_slogg': (4.5, "Stellar log gravity"),
+        'koi_srad': (1.0, "Stellar radius (Solar)"),
+        'koi_kepmag': (15.0, "Kepler magnitude"),
+        'koi_steff_err1': (50.0, "Stellar temp error +"),
+        'koi_steff_err2': (-50.0, "Stellar temp error -"),
+        'koi_slogg_err1': (0.1, "Log gravity error +"),
+    },
+    "🔭 Observational Data": {
+        'koi_model_snr': (10.0, "Signal-to-noise ratio"),
+        'ra': (290.0, "Right ascension (deg)"),
+        'dec': (45.0, "Declination (deg)"),
+    }
 }
 
 # Input Form
-inputs = {}
+st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+st.markdown("### 🎛️ Enter Planetary System Parameters")
+
+input_data = {}
+
 for group_name, features in feature_groups.items():
-    with st.expander(f"{group_name} ({len(features)} features)", expanded=True):
+    with st.expander(f"{group_name} ({len(features)} parameters)", expanded=False):
         cols = st.columns(3)
-        for idx, (feature, default, label) in enumerate(features):
+        for idx, (feature, (default_val, description)) in enumerate(features.items()):
             with cols[idx % 3]:
-                inputs[feature] = st.number_input(
-                    label,
-                    value=default,
-                    format="%.6f",
+                input_data[feature] = st.number_input(
+                    description,
+                    value=float(default_val),
+                    format="%.4f",
                     key=feature,
                     help=f"Feature: {feature}"
                 )
 
-st.markdown("---")
+st.markdown('</div>', unsafe_allow_html=True)
 
-# Predict Button
-if st.button("🔮 Classify Exoplanet"):
-    with st.spinner("🌌 Analyzing planetary data..."):
+# Classify Button
+st.markdown("<br>", unsafe_allow_html=True)
+if st.button("🚀 CLASSIFY EXOPLANET"):
+    if model is not None:
         try:
-            X_new = pd.DataFrame([inputs])
-            X_new = X_new.reindex(columns=feature_names, fill_value=0)
+            # Prepare input
+            input_df = pd.DataFrame([input_data])
+            input_df = input_df.reindex(columns=feature_names, fill_value=0)
             
-            pred = model.predict(X_new)
-            proba = model.predict_proba(X_new) if hasattr(model, "predict_proba") else None
+            # Prediction
+            prediction = model.predict(input_df)[0]
             
-            prediction = pred[0] if hasattr(pred, "__len__") else pred
+            # Get probability if available
+            confidence = None
+            if hasattr(model, 'predict_proba'):
+                proba = model.predict_proba(input_df)[0]
+                confidence = proba[prediction] * 100
             
-            if prediction == 1 or str(prediction).upper() == "CONFIRMED":
-                st.markdown("""
+            # Display Results
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            if prediction == 1:
+                st.markdown(f"""
                 <div class="success-box">
-                    <h2>✅ CONFIRMED EXOPLANET</h2>
-                    <p style="font-size: 1.2rem; color: #22c55e;">
-                        This object shows strong evidence of being an exoplanet
+                    <div class="success-icon">🌟</div>
+                    <div class="success-title">CONFIRMED EXOPLANET</div>
+                    <p style="color: #6ee7b7; font-size: 1.2rem; margin-top: 1rem;">
+                        This celestial body exhibits characteristics consistent with an exoplanet!
                     </p>
+                    {f'<div class="confidence-badge">Confidence: {confidence:.2f}%</div>' if confidence else ''}
                 </div>
                 """, unsafe_allow_html=True)
+                st.balloons()
             else:
-                st.markdown("""
+                st.markdown(f"""
                 <div class="error-box">
-                    <h2>❌ FALSE POSITIVE</h2>
-                    <p style="font-size: 1.2rem; color: #ef4444;">
-                        This object is likely not an exoplanet
+                    <div class="error-icon">⚠️</div>
+                    <div class="error-title">FALSE POSITIVE</div>
+                    <p style="color: #fca5a5; font-size: 1.2rem; margin-top: 1rem;">
+                        The signal does not match exoplanet characteristics.
                     </p>
+                    {f'<div class="confidence-badge">Confidence: {confidence:.2f}%</div>' if confidence else ''}
                 </div>
                 """, unsafe_allow_html=True)
             
-            if proba is not None:
-                st.markdown("### 📊 Prediction Confidence")
-                proba_values = proba[0].tolist() if hasattr(proba[0], "tolist") else proba[0]
-                conf_col1, conf_col2 = st.columns(2)
-                with conf_col1:
-                    st.metric("False Positive Probability", f"{proba_values[0]:.2%}")
-                with conf_col2:
-                    st.metric("Confirmed Probability", f"{proba_values[1]:.2%}")
-                    
+            # Additional Details
+            if confidence:
+                st.markdown("<br>", unsafe_allow_html=True)
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("🎯 Prediction", "Exoplanet" if prediction == 1 else "Not Exoplanet")
+                with col2:
+                    st.metric("📊 Confidence", f"{confidence:.2f}%")
+                with col3:
+                    st.metric("🤖 Model", "Random Forest")
+            
         except Exception as e:
-            st.error(f"❌ Prediction Error: {e}")
-            st.write("Debug Info:")
-            st.write("Input shape:", X_new.shape)
-            st.write("Expected features:", len(feature_names))
+            st.error(f"❌ Error during prediction: {str(e)}")
+            st.code(f"Debug Info:\n{str(e)}")
+    else:
+        st.warning("⚠️ Model not loaded. Please check the model file.")
+
+# Footer
+st.markdown("<br><br>", unsafe_allow_html=True)
+st.markdown("""
+<div style="text-align: center; color: #6b7280; padding: 2rem;">
+    <p>🌌 Powered by Advanced Machine Learning | Built with Streamlit</p>
+</div>
+""", unsafe_allow_html=True)
