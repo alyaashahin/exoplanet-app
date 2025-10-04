@@ -153,6 +153,10 @@ def assign_random_all():
     for k in FEATURE_RANGES.keys():
         st.session_state.feature_values[k] = random_value_between(k)
 
+# Callback function for individual randomize buttons
+def randomize_callback(feature):
+    st.session_state.feature_values[feature] = random_value_between(feature)
+
 # Load CatBoost model directly
 model = None
 if os.path.exists("catboost.pkl"):
@@ -161,8 +165,14 @@ else:
     st.error("❌ Could not find `catboost.pkl`. Please place it in the same directory as this script.")
 
 # Input grid
-# Input grid
 st.header("🛠️ Feature Inputs")
+
+# Handle randomize button clicks first
+for feat in FEATURE_RANGES.keys():
+    if f"rand_{feat}" in st.session_state and st.session_state[f"rand_{feat}"]:
+        st.session_state.feature_values[feat] = random_value_between(feat)
+        st.session_state[f"rand_{feat}"] = False
+        st.rerun()
 
 # ✅ make 2 columns (so features split nicely)
 cols = st.columns(2)
@@ -170,12 +180,7 @@ cols = st.columns(2)
 for i, (feat, (lo, hi)) in enumerate(FEATURE_RANGES.items()):
     c1, c2 = cols[i % 2].columns([4, 1])  # main box + dice button
     
-    # Check if randomize button was clicked first
-    if c2.button("🎲", key=f"rand_{feat}", help="Randomize this feature"):
-        assign_random(feat)
-        st.rerun()
-    
-    # Then create the number input with the current value
+    # Create the number input with the current value from session state
     val = c1.number_input(
         label=feat,
         min_value=float(lo),
@@ -184,7 +189,13 @@ for i, (feat, (lo, hi)) in enumerate(FEATURE_RANGES.items()):
         format="%.6g",
         key=f"input_{feat}",
     )
+    # Update session state with the current input value
     st.session_state.feature_values[feat] = float(val)
+    
+    # Randomize button
+    if c2.button("🎲", key=f"rand_{feat}", help="Randomize this feature"):
+        st.session_state[f"rand_{feat}"] = True
+        st.rerun()
 
     # 👶 Childish explanation in an expander
     with c1.expander("Click for explanation"):
