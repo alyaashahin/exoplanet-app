@@ -169,6 +169,13 @@ cols = st.columns(2)
 
 for i, (feat, (lo, hi)) in enumerate(FEATURE_RANGES.items()):
     c1, c2 = cols[i % 2].columns([4, 1])  # main box + dice button
+    
+    # Check if randomize button was clicked first
+    if c2.button("🎲", key=f"rand_{feat}", help="Randomize this feature"):
+        assign_random(feat)
+        st.rerun()
+    
+    # Then create the number input with the current value
     val = c1.number_input(
         label=feat,
         min_value=float(lo),
@@ -178,10 +185,6 @@ for i, (feat, (lo, hi)) in enumerate(FEATURE_RANGES.items()):
         key=f"input_{feat}",
     )
     st.session_state.feature_values[feat] = float(val)
-
-    if c2.button("🎲", key=f"rand_{feat}", help="Randomize this feature"):
-        assign_random(feat)
-        st.rerun()
 
     # 👶 Childish explanation in an expander
     with c1.expander("Click for explanation"):
